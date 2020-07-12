@@ -1,0 +1,205 @@
+---
+title: "Classification1"
+author: "Valencia Lie"
+date: "13 July 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Business question of the day
+
+Customer churn rate is the rate at which customers stop doing business with an entity. It is most commonly expressed as the percentage of service subscribers who discontinue their subscriptions within a given time period. It is vital for businesses to be able to predict whether their customers will churn or not, so that they will be able to improve their products or services if the predicted churn rate is high. They will also be able to cater to the customer's tastes and preferences more if they know the direct factors that affect the customer churn rate.
+
+In this particular data set, the parameters are:
+
+* CustomerID: Customer ID
+* Gender: Whether the customer is a male or a female
+* SeniorCitizen: Whether the customer is a senior citizen or not (1, 0)
+* Partner: Whether the customer has a partner or not (Yes, No)
+* Dependents: Whether the customer has dependents or not (Yes, No)
+* Tenure: Number of months the customer has stayed with the company
+* MultipleLines: Whether the customer has multiple lines or not (Yes, No, No phone service)
+* OnlineSecurity: Whether the customer has online security or not 
+* OnlineBackup: Whether the customer has online backup or not 
+* DeviceProtection: Whether the customer has device protection or not 
+* TechSupport: Whether the customer has tech support or not 
+* StreamingTV: Whether the customer has streaming TV or not
+* StreamingMovies: Whether the customer has streaming movies or not
+* Contract: The contract term of the customer (Month-to-month, One year, Two year)
+* PaperlessBilling: Whether the customer has paperless billing or not (Yes, No)
+* PaymentMethod: The customer’s payment method (Electronic check, Mailed check, Bank transfer (automatic), Credit card (automatic))
+* MonthlyCharges: The amount charged to the customer monthly
+* TotalCharges: The total amount charged to the customer
+* Churn: Whether the customer churned or not (Yes or No)
+
+In the report below, I will attempt to predict whether a customer will churn or not based on some of these parameters using logistic regression and k-Nearest-Neighbour (kNN) model and will check how reliable my model is in predicting an outcome.
+
+# Structure of this report
+- Importing dataset and cleansing 
+- Exploratory data analysis:
+  - Proportion of data
+  - Distribution of data analysis
+- Cross Validation:
+  - Recheck proportion of data
+- Building a logistic regression model:
+  - Insights of coefficients
+  - Check for perfect separation
+- Building a kNN model:
+  - Pre-processing
+  - Standardisation
+  - Picking of optimal k
+- Predicting future data:
+  - Logistic Regression
+  - kNN
+- Evaluation:
+  - For logistic regression model:
+    1. Residuals
+    2. 3 Assumptions
+    3. Accuracy, Sensitivity and Precision
+  - For kNN:
+    1. Accuracy, Sensitivity and Precision
+- Model tuning
+- Final model after comparison + conclusion
+
+#Importing dataset and cleansing
+
+```{r}
+library(tidyverse)
+churn <- read_csv("watson-churn.csv")
+```
+
+```{r}
+head(churn)
+```
+
+```{r}
+churn <- churn %>% 
+  select(-customerID) %>% 
+  mutate_if(is.character, as.factor)
+head(churn)
+```
+
+```{r}
+anyNA(churn)
+churn %>% 
+  is.na() %>% 
+  colSums()
+
+churn <- churn %>% 
+  drop_na()
+```
+
+#Exploratory data analysis
+
+##Proportion of data
+```{r}
+round(prop.table(table(churn$Churn)),2)
+```
+
+Even though the proportion is not perfect at 50:50, it is still considered balance as an imbalance data is usually 90:10 or 95:5.
+
+##Distribution of data analysis
+```{r}
+summary(churn)
+```
+
+Since the numeric ranges between predictors vary greatly, hence we would need to process the data in order to standardise them into the same range using Z score standardisation to build a kNN model.
+
+# Cross validation
+```{r}
+library(rsample)
+set.seed(100)
+idx <- initial_split(data = churn, strata = Churn , prop = 0.8)
+test <- testing(idx)
+train <- training(idx)
+```
+
+## Rechecking proportion of data
+```{r}
+round(prop.table(table(test_y$Churn)),2)
+```
+
+```{r}
+round(prop.table(table(train_y$Churn)),2)
+```
+
+Since the proportion matched before cross-validation, we are ready to move on.
+
+#Building a logistic regression model
+
+Using stepwise regression,
+
+##Backward
+
+```{r}
+model_all <- glm(formula = Churn ~., data = train, family = "binomial")
+model_none <- glm(Churn ~ 1, data = train, family = "binomial")
+```
+
+```{r}
+backward <- step(model_all, direction = "backward")
+summary(backward)
+```
+
+According to this backward model, the AIC is 3677.15 and the model has a residual deviance of 3641.1. 
+Let's try to compare it with a forward and both model.
+
+## Forward
+```{r}
+forward <- step(model_none, direction = "forward", scope = list(lower = model_none, upper = model_all))
+summary(forward)
+```
+
+This forward model has an AIC of 3677.15 and residual deviance of 3641.1.
+
+
+##Both 
+```{r}
+both <- step(model_none, direction = "both", scope = list(lower = model_none, upper = model_all))
+summary(both)
+```
+
+The both model has an AIC of 3677.15 and residual deviance of 3641.1. This shows that all backward, forward and both models have the same AIC and residual deviance. Hence, for simplicity sake, we will move forward with the backward model as our logistic regression model.
+
+## Insights of coefficients
+
+## Checking for perfect separation
+According to the summary of the model, there seems to not be any perfect separation that had occurred. This is because, none of the coefficients differ very greatly with each other and the residual deviance is not even close to 0. Thus, it is safe to conclude that there is no perfect separation.
+
+# Building kNN model
+
+## Pre-processing
+```{r}
+test_x <- test %>% 
+  select_if(is.numeric)
+
+test_y <- test %>%
+  select_if(is.factor)
+
+train_x <- train %>% 
+  select_if(is.numeric)
+
+train_y <- train %>% 
+  select_if(is.factor)
+```
+
+## Standardisation
+```{r}
+train_x <-  scale(train_x)
+test_x <- scale(test_x,
+      center = attr(train_x, "scaled:center"),
+      scale = attr(train_x, "scaled:scale"))
+```
+
+##Optimum K
+```{r}
+sqrt(nrow(train_x))
+```
+
+```{r}
+
+```
+
