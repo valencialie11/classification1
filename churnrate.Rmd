@@ -1,8 +1,13 @@
 ---
-title: "Classification1"
+title: "Customer Churn Rate"
 author: "Valencia Lie"
 date: "13 July 2020"
-output: html_document
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    toc: 6
+    number_sections: true
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -53,16 +58,16 @@ In the report below, I will attempt to predict whether a customer will churn or 
   - Picking of optimal k
 - Predicting future data:
   - Logistic Regression
-  - kNN
 - Evaluation:
   - For logistic regression model:
     1. Residuals
     2. 3 Assumptions
-    3. Accuracy, Sensitivity and Precision
+    3. Accuracy, Sensitivity and Precision (using confusion matrix)
   - For kNN:
-    1. Accuracy, Sensitivity and Precision
+    1. Accuracy, Sensitivity and Precision (using confusion matrix)
+- Final model
 - Model tuning
-- Final model after comparison + conclusion
+- Final model + conclusion
 
 #Importing dataset and cleansing
 
@@ -78,7 +83,8 @@ head(churn)
 ```{r}
 churn <- churn %>% 
   select(-customerID) %>% 
-  mutate_if(is.character, as.factor)
+  mutate_if(is.character, as.factor) %>% 
+  mutate(SeniorCitizen = as.factor(SeniorCitizen))
 head(churn)
 ```
 
@@ -119,11 +125,11 @@ train <- training(idx)
 
 ## Rechecking proportion of data
 ```{r}
-round(prop.table(table(test_y$Churn)),2)
+round(prop.table(table(test$Churn)),2)
 ```
 
 ```{r}
-round(prop.table(table(train_y$Churn)),2)
+round(prop.table(table(train$Churn)),2)
 ```
 
 Since the proportion matched before cross-validation, we are ready to move on.
@@ -165,6 +171,29 @@ summary(both)
 The both model has an AIC of 3677.15 and residual deviance of 3641.1. This shows that all backward, forward and both models have the same AIC and residual deviance. Hence, for simplicity sake, we will move forward with the backward model as our logistic regression model.
 
 ## Insights of coefficients
+Since there are a lot of predictors being used, for simplicity sake, we will try to interpret only 3 predictors: namely TechSupport, Monthly charges and Contractyear.
+
+```{r}
+#Tech support
+library(gtools)
+exp(-0.5567838)
+inv.logit(-0.5567838)
+
+```
+According to the above calculation, we can say that when a customer has tech support, he/she is 0.573 times more likely to churn, assuming that other variables are kept constant. This means that a customer is more likely to churn if he/she does NOT have tech support than if he/she does. We can also say that the probability of a customer churning if he/she has tech support is mere 0.364. Logically, this makes sense, because if a customer has plenty of tech support, he/she will be able to have a more enjoyable experience when using a certain product/service and thus will be less willing to churn.
+
+```{r}
+#Monthlycharges
+exp(0.0261480)
+```
+According to the above calculation, an increase in $1 in the monthly charges charged to the customer, he/she is 1.026 more likely to churn, assuming that other variables are kept constant. Again, logically, this makes sense because the higher the subscription charges, customers will be less willing to continue using the product/services if they deem the price to be too expensive.
+
+```{r}
+#Contractyear
+exp(-0.5077005)
+exp(-1.0193470)
+```
+According to the above calculation, we can say that when a customer is under a 1 year contract, he/she is 0.602 times more likely to churn than if he/she is under a month-to-month contract, assuming that other variables are kept constant. In addition, when a customer is under a 2 year contract, he/she is 0.361 times more likely to churn than if he/she is under a month-to-month contract, assuming that other variables are kept constant. This means that a person is more likely to churn if he/she is on month-to-month contract, followed by 1 year contract, followed by 2 year contract. Logically, this makes perfect sense, because the longer the contract, the amount of money needed to pay upfront is larger, and hence customers will be less willing to terminate their contract/subscription before their contract ends. On the other hand, if the contract is short, customers will feel less burdened with the amount of payment made and thus may be willing to churn more than if the customer is on a yearly contract.
 
 ## Checking for perfect separation
 According to the summary of the model, there seems to not be any perfect separation that had occurred. This is because, none of the coefficients differ very greatly with each other and the residual deviance is not even close to 0. Thus, it is safe to conclude that there is no perfect separation.
@@ -184,6 +213,10 @@ train_x <- train %>%
 
 train_y <- train %>% 
   select_if(is.factor)
+
+train_x 
+train_y
+
 ```
 
 ## Standardisation
@@ -200,6 +233,143 @@ sqrt(nrow(train_x))
 ```
 
 ```{r}
-
+library(class)
+knnmodel <- knn(train = train_x, test = test_x, cl = train_y$Churn, k = 63)
 ```
 
+#Predicting Future data
+
+## Logistic Regression
+
+```{r}
+test$prob <- predict(backward, newdata = test, type = "response")
+test$label <- ifelse(test = test$prob > 0.5, "Yes", "No")
+test$label <- as.factor(test$label)
+```
+
+# Evaluation
+
+## Logistic regression
+
+### Residuals
+According to the summary of the backward model, it has a residual deviance of 3641.1. Since there is no benchmark on what is considered to be a low residual deviance, it is hard to conclude whether this model is good enough based on this evaluation technique alone. Hence, we will try to see whether it fulfills the other aspects of being a good logistic regression model.
+
+### Three Assumptions:
+
+#### Independent Observations
+According to the data it is safe to conclude that each observation is independent with each other because it is unlikely for a customer's data to be dependent on another customer's data. Hence, we say that this model fulfills this particular assumption.
+
+However, in the event that it is very hard to pinpoint whether the observations are independent, we can conduct chi-square test between all the predictors (two at a time only).
+
+Chi-square test hypothesis
+H0: The two variables are independent.
+H1: The two variables relate to each other.
+
+#### Linearity of Predictor & Log of Odds
+Since we have cleaned the data and changed some of the data types into their respective suitable data types, it can be said that this model has achieved linearity of predictor and log of odds. 
+
+#### No multicollinearity
+```{r}
+#Done in Rstudio cloud because my old R does not support the package
+#library(car)
+#vif(backward)
+```
+                      GVIF Df GVIF^(1/(2*Df))
+SeniorCitizen     1.103626  1        1.050536
+Dependents        1.052844  1        1.026082
+tenure           34.097157  1        5.839277
+MultipleLines     1.433372  1        1.197235
+OnlineSecurity    1.097261  1        1.047502
+OnlineBackup      1.245625  1        1.116076
+DeviceProtection  1.336968  1        1.156273
+TechSupport       1.158529  1        1.076350
+StreamingMovies   1.769173  1        1.330103
+Contract          1.763532  2        1.152380
+PaperlessBilling  1.069084  1        1.033965
+PaymentMethod     1.231277  3        1.035284
+MonthlyCharges    3.815317  1        1.953284
+TotalCharges     42.319693  1        6.505359
+
+Besides TotalCharges and tenure, the rest has VIF of less than 10, making them non-multicollinear to each other. 
+
+### Confusion Matrix
+```{r}
+library(caret)
+confusionMatrix(data = test$label, reference = test$Churn, positive = "Yes")
+```
+Based on the confusion matrix above, we can tell that the accuracy of the model is 
+0.7298, the recall is 0.5615 and the precision is 0.5933. Based on our business problem, it is vital to prioritise 'recall' above the other metrics because it is crucial for the company to lower down the occasion in which they mistakenly predict that customers will not churn when in reality they will. 
+
+## kNN
+### Confusion Matrix
+```{r}
+confusionMatrix(data = knnmodel, reference = test_y$Churn, positive = "Yes")
+```
+This kNN model has an accuracy of 0.7029, recall of 0.3880 and precision of 0.5694. Similarly with the backward model, it is vital to prioritise 'recall' over the other metrics. 
+
+# Comparison
+According to the above confusion matrix, we can tell that the backward model generally performs better than the kNN model. The backward model has higher accuracy (0.7298 vs 0.7029), higher recall (0.5615 vs 0.3880) and higher precision (0.5933 vs 0.5694). In addition, since we mainly prioritise 'recall', the high discrepancies between the two recall values make it certain that we should choose the backward model over the kNN model.
+
+Moreover, since we know that we should prioritise recall, we are able to further tune our backward model (unlike how we can't with kNN unless we change the value of k around) in order to achieve better recall.
+
+# Tuning model
+In order to achieve the assumption of no multicollinearity, we will try to make a model that excludes both Totalcharges and tenure.
+
+```{r}
+final_model <- glm(Churn ~ SeniorCitizen + Dependents + tenure+ MultipleLines + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingMovies + Contract + PaperlessBilling + PaymentMethod +MonthlyCharges, data = train, family = "binomial")
+```
+
+Now, we will try to test the no multi-collinearity assumption again using vif.
+```{r}
+#vif(final_model)
+```
+                     GVIF Df GVIF^(1/(2*Df))
+SeniorCitizen    1.104169  1        1.050795
+Dependents       1.052093  1        1.025716
+tenure           2.265190  1        1.505055
+MultipleLines    1.404251  1        1.185011
+OnlineSecurity   1.091441  1        1.044721
+OnlineBackup     1.220036  1        1.104552
+DeviceProtection 1.308876  1        1.144061
+TechSupport      1.148543  1        1.071701
+StreamingMovies  1.713827  1        1.309132
+Contract         1.661308  2        1.135305
+PaperlessBilling 1.066827  1        1.032873
+PaymentMethod    1.213847  3        1.032826
+MonthlyCharges   2.722947  1        1.650136
+
+Now, we can see that all the VIFs of the predictors are below 10, which means this model fulfills this assumption.
+
+We can also tune our backward model to achieve better recall value by decreasing the threshold probability when predicting future data. Previously, we used the default 0.5 and so we can lower it down to 0.45 or 0.4 for better recall result. This is because, by lowering the threshold probability, we are lowering the possibility of false negative as compared to before.
+
+```{r}
+library(caret)
+test$prob0 <- predict(final_model, newdata = test, type = "response")
+test$label0 <- ifelse(test = test$prob0 > 0.5, "Yes", "No")
+test$label0 <- as.factor(test$label0)
+confusionMatrix(data = test$label0, reference = test$Churn, positive = "Yes")
+```
+
+```{r}
+test$label1 <- ifelse(test = test$prob0 > 0.45, "Yes", "No")
+test$label1 <- as.factor(test$label1)
+confusionMatrix(data = test$label1, reference = test$Churn, positive = "Yes")
+```
+
+We can see that by lowering the probability threshold, the recall value has improved (0.6215 vs 0.5552), although accuracy (0.7329 to 0.7288) and precision has deteriorated slightly (0.6007 to 0.5811). 
+
+We will try to lower down the probability threshold again to 0.4 and see whether it is worth doing that. 
+
+```{r}
+test$label2 <- ifelse(test = test$prob0 > 0.4, "Yes", "No")
+test$label2 <- as.factor(test$label2)
+confusionMatrix(data = test$label2, reference = test$Churn, positive = "Yes")
+```
+When we lower the threshold even more, we can see a dip in both the accuracy (to 0.7267) and precision (to 0.5696), though there is improvement in the recall value 
+(to 0.6845). Since we are not able to win in all metrics, I would say that it is okay to lower the threshold to 0.4 as the dip in accuracy and precision is not that much and that there is some substantial improvement in the recall metrics (which is what we needed in this particular case). 
+
+# Final model and conclusion
+
+In conclusion, the final model I would use to predict whether a customer will or will not churn is the tuned final model (with TotalCharges and tenure deleted from the model and threshold of 0.4). This is because, not only does it have a better performance, in terms of metrics, compared to the kNN model, it also satisfies what constitutes to be a good logistic regression model. It has a reasonable residual deviance value, it fulfills all three assumptions and delivers a decent performance in terms of the recall metric. 
+
+However, with that being said, there is always a caveat in all kinds of models; they are imperfect and will be riddled with issues in one way or another. After all, predictions are tough to make on something as abstract and unpredictable as the future. 
