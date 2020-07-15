@@ -1,6 +1,8 @@
 # Classification 1: Logistic regression and k-Nearest-Neighbour model
 
-The dataset is used to predict a customer's choice of churning or not based on the following parameters included in the dataset:
+The dataset is used to predict a customer's choice of churning or not based on the following parameters.
+
+## Parameters:
 
 * CustomerID: Customer ID
 * Gender: Whether the customer is a male or a female
@@ -22,7 +24,7 @@ The dataset is used to predict a customer's choice of churning or not based on t
 * TotalCharges: The total amount charged to the customer
 * Churn: Whether the customer churned or not (Yes or No)
 
-Dependencies:
+## Dependencies:
 - tidyverse
 - rsample
 - gtools
