@@ -71,7 +71,7 @@ In the report below, I will attempt to predict whether a customer will churn or 
 
 #Importing dataset and cleansing
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 churn <- read_csv("watson-churn.csv")
 ```
@@ -97,6 +97,8 @@ churn %>%
 churn <- churn %>% 
   drop_na()
 ```
+
+There are 3 missing values on the column TotalCharges. However, since the proportion of these missing values is incredibly small compared to the total amount of data, we will drop these missing values.
 
 #Exploratory data analysis
 
@@ -146,7 +148,7 @@ model_none <- glm(Churn ~ 1, data = train, family = "binomial")
 ```
 
 ```{r}
-backward <- step(model_all, direction = "backward")
+backward <- step(model_all, direction = "backward", trace = FALSE)
 summary(backward)
 ```
 
@@ -155,7 +157,7 @@ Let's try to compare it with a forward and both model.
 
 ## Forward
 ```{r}
-forward <- step(model_none, direction = "forward", scope = list(lower = model_none, upper = model_all))
+forward <- step(model_none, direction = "forward", scope = list(lower = model_none, upper = model_all), trace= FALSE)
 summary(forward)
 ```
 
@@ -164,7 +166,7 @@ This forward model has an AIC of 3677.15 and residual deviance of 3641.1.
 
 ##Both 
 ```{r}
-both <- step(model_none, direction = "both", scope = list(lower = model_none, upper = model_all))
+both <- step(model_none, direction = "both", scope = list(lower = model_none, upper = model_all), trace = FALSE)
 summary(both)
 ```
 
@@ -231,6 +233,7 @@ test_x <- scale(test_x,
 ```{r}
 sqrt(nrow(train_x))
 ```
+Since the optimum K needs to be an odd number to prevent having tied results, we will round it up to k = 63.
 
 ```{r}
 library(class)
